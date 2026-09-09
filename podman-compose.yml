@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: campfire-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: campfire_db
+      POSTGRES_USER: campfire_user
+      POSTGRES_PASSWORD: campfire_secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:Z
+
+volumes:
+  pgdata:

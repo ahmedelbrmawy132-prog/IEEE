@@ -8,13 +8,19 @@
   "liveNow": true,
   "panels": [
     {
-      "title": "P95 End-to-End Latency (Target: <1.5s SLA)",
+      "title": "AWS ALB Target Response Time (CloudWatch <1.5s SLA)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": "CloudWatch",
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))",
-          "legendFormat": "P95 Latency (s)"
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "TargetResponseTime",
+          "statistic": "Average",
+          "dimensions": {
+            "LoadBalancer": "app/campfire-alb"
+          },
+          "period": "60"
         }
       ],
       "thresholds": {
@@ -26,13 +32,18 @@
       }
     },
     {
-      "title": "AI Service Outage & Fallback Invocations",
+      "title": "Active WebSocket Connections (/ws/sos)",
       "type": "stat",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": "CloudWatch",
       "targets": [
         {
-          "expr": "sum(increase(ai_fallback_total[1m]))",
-          "legendFormat": "Fallback Triggers"
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "ActiveConnectionCount",
+          "statistic": "Sum",
+          "dimensions": {
+            "LoadBalancer": "app/campfire-alb"
+          }
         }
       ]
     }
@@ -40,11 +51,10 @@
   "refresh": "5s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["demo", "sla", "campfire"],
+  "tags": ["aws", "cloudwatch", "sla", "campfire"],
   "time": { "from": "now-15m", "to": "now" },
-  "timepicker": {},
   "timezone": "browser",
-  "title": "Campfire Demo Performance & SLA Dashboard",
-  "uid": "campfire-sla-perf",
-  "version": 1
+  "title": "Campfire CloudWatch & SLA Live APM",
+  "uid": "campfire-cloudwatch-apm",
+  "version": 2
 }

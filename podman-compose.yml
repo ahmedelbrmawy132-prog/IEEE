@@ -26,5 +26,29 @@ services:
     depends_on:
       - postgres
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: campfire-prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: campfire-grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro,Z
+      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/campfire.json:ro,Z
+    depends_on:
+      - prometheus
+
 volumes:
   pgdata:

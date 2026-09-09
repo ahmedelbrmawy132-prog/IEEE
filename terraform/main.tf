@@ -176,3 +176,109 @@ resource "aws_budgets_budget" "cost_watchdog" {
     subscriber_email_addresses = [var.alert_email]
   }
 }
+# ============================================================================
+# Task 5: Amazon Elastic Container Registry (ECR)
+# ============================================================================
+resource "aws_ecr_repository" "go_gateway" {
+  name                 = "campfire-go-gateway"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
+resource "aws_ecr_repository" "python_ml" {
+  name                 = "campfire-python-ml"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
+# ============================================================================
+# Task 3: AWS Application Load Balancer (ALB) & Routing Gates
+# ============================================================================
+resource "aws_lb" "campfire_alb" {
+  name               = "campfire-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.app_sg.id]
+  subnets            = [aws_subnet.public_1.id, aws_subnet.public_2.id]
+
+  # 3600s Idle Timeout to prevent emergency WebSocket drops
+  idle_timeout = 3600
+
+  tags = {
+    Name = "campfire-public-alb"
+  }
+}
+
+# Target Group for Go Gateway (HTTP REST)
+resource "aws_lb_target_group" "tg_gateway_http" {
+  name        = "tg-go-gateway-http"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.campfire_vpc.id
+  target_type = "ip"
+
+  health_check {
+    path                = "/healthz"
+    matcher             = "200"
+    interval            = 15
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+  }
+}
+
+# Target Group for Emergency WebSockets (/ws/sos) with Stickiness & 3600s Keep-Alive
+resource "aws_lb_target_group" "tg_gateway_ws" {
+  name        = "tg-go-gateway-ws"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.campfire_vpc.id
+  target_type = "ip"
+
+  stickiness {
+    type            = "lb_cookie"
+    cookie_duration = 86400
+    enabled         = true
+  }
+
+  health_check {
+    path                = "/healthz"
+    matcher             = "200"
+    interval            = 10
+  }
+}
+
+# ALB HTTP Listener (Port 80)
+resource "aws_lb_listener" "http_listener" {
+  load_balancer_arn = aws_lb.campfire_alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_gateway_http.arn
+  }
+}
+
+# Dedicated Routing Rule for SOS WebSockets: /ws/sos*
+resource "aws_lb_listener_rule" "ws_sos_rule" {
+  listener_arn = aws_lb_listener.http_listener.arn
+  priority     = 10
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_gateway_ws.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/ws/sos*"]
+    }
+  }
+}
